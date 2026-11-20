@@ -1,6 +1,6 @@
 const ADMIN_ID = 5151757168; 
 const WEBHOOK_SECRET = "GarisOffer9231998"; 
-const RELAYER_USERNAME = "mentalistgift"; // ИЗМЕНЕНО НА @mentalistgift
+const RELAYER_USERNAME = "GarisOfferRelayer"; // ВЕРНУЛ ОБРАТНО
 
 export default {
   async fetch(request, env, ctx) {
@@ -122,7 +122,6 @@ export default {
         if (iq.from.last_name) senderName += " " + iq.from.last_name;
         if (!senderName) senderName = iq.from.username ? "@" + iq.from.username : "Игрок";
         
-        // ГАРАНТ ТЕПЕРЬ @mentalistgift
         const targetReceiver = RELAYER_USERNAME;
 
         let text = "";
